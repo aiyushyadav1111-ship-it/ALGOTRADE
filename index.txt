@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Algorithmic Trading Simulator | SMA Crossover</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { background: #0f172a; color: #e2e8f0; }
+    .card { background: #1e293b; border: 1px solid #334155; }
+    .positive { color: #22c55e; }
+    .negative { color: #ef4444; }
+    .signal-buy { background: rgba(34, 197, 94, 0.15); border-left: 4px solid #22c55e; }
+    .signal-sell { background: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-6">
+
+  <div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold text-white">Algorithmic Trading Simulator</h1>
+        <p class="text-slate-400 text-sm mt-1">SMA Crossover Strategy • Educational Demo</p>
+      </div>
+      <div class="flex gap-3">
+        <button id="startBtn" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg font-medium transition">
+          Start
+        </button>
+        <button id="pauseBtn" class="px-5 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-medium transition" disabled>
+          Pause
+        </button>
+        <button id="resetBtn" class="px-5 py-2 bg-slate-600 hover:bg-slate-500 rounded-lg font-medium transition">
+          Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div class="card p-4 rounded-xl">
+        <label class="text-xs text-slate-400">Short SMA Period</label>
+        <input id="shortSMA" type="number" value="9" min="2" max="50" 
+               class="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white">
+      </div>
+      <div class="card p-4 rounded-xl">
+        <label class="text-xs text-slate-400">Long SMA Period</label>
+        <input id="longSMA" type="number" value="21" min="5" max="100" 
+               class="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white">
+      </div>
+      <div class="card p-4 rounded-xl">
+        <label class="text-xs text-slate-400">Initial Capital ($)</label>
+        <input id="capital" type="number" value="10000" min="1000" step="1000"
+               class="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white">
+      </div>
+      <div class="card p-4 rounded-xl">
+        <label class="text-xs text-slate-400">Position Size (%)</label>
+        <input id="posSize" type="number" value="100" min="10" max="100" step="10"
+               class="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white">
+      </div>
+      <div class="card p-4 rounded-xl">
+        <label class="text-xs text-slate-400">Speed (ms)</label>
+        <input id="speed" type="number" value="300" min="50" max="2000" step="50"
+               class="w-full mt-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white">
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="card p-4 rounded-xl">
+        <div class="text-xs text-slate-400">Equity</div>
+        <div id="equity" class="text-xl font-bold text-white mt-1">$10,000.00</div>
+      </div>
+      <div class="card p-4 rounded-xl">
+        <div class="text-xs text-slate-400">P&L</div>
+        <div id="pnl" class="text-xl font-bold mt-1">$0.00</div>
+      </div>
+      <div class="card p-4 rounded-xl">
+        <div class="text-xs text-slate-400">Position</div>
+        <div id="position" class="text-xl font-bold text-white mt-1">FLAT</div>
+      </div>
+      <div class="card p-4 rounded-xl">
+        <div class="text-xs text-slate-400">Current Price</div>
+        <div id="price" class="text-xl font-bold text-cyan-400 mt-1">$100.00</div>
+      </div>
+    </div>
+
+    <!-- Chart + Trade Log -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Chart -->
+      <div class="lg:col-span-2 card p-4 rounded-xl">
+        <canvas id="priceChart" height="280"></canvas>
+      </div>
+
+      <!-- Trade Log -->
+      <div class="card p-4 rounded-xl flex flex-col">
+        <h3 class="font-semibold mb-3 text-white">Trade Log</h3>
+        <div id="tradeLog" class="flex-1 overflow-y-auto space-y-2 text-sm max-h-80">
+          <div class="text-slate-500 text-center py-8">No trades yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Strategy Explanation -->
+    <div class="card p-5 rounded-xl mt-6">
+      <h3 class="font-semibold text-white mb-2">How the Algorithm Works</h3>
+      <p class="text-slate-400 text-sm leading-relaxed">
+        This simulator uses a classic <strong>Simple Moving Average (SMA) Crossover</strong> strategy:
+        <br>• <span class="text-emerald-400">BUY</span> when the Short SMA crosses <strong>above</strong> the Long SMA (bullish signal)
+        <br>• <span class="text-red-400">SELL</span> when the Short SMA crosses <strong>below</strong> the Long SMA (bearish signal)
+        <br>Price is generated using a random walk to simulate market movement. This is for educational purposes only.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // ====================== STATE ======================
+    let prices = [];
+    let shortSMA = [];
+    let longSMA = [];
+    let equityCurve = [];
+    let trades = [];
+    let cash = 10000;
+    let position = 0;        // number of shares
+    let entryPrice = 0;
+    let isRunning = false;
+    let intervalId = null;
+    let candle = 0;
+
+    // ====================== CHART ======================
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Price',
+            data: [],
+            borderColor: '#22d3ee',
+            backgroundColor: 'rgba(34, 211, 238, 0.05)',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1,
+            fill: true
+          },
+          {
+            label: 'Short SMA',
+            data: [],
+            borderColor: '#22c55e',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.1
+          },
+          {
+            label: 'Long SMA',
+            data: [],
+            borderColor: '#f97316',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: { color: '#94a3b8', boxWidth: 12 }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#64748b', maxTicksLimit: 10 },
+            grid: { color: 'rgba(51,65,85,0.5)' }
+          },
+          y: {
+            ticks: { color: '#64748b' },
+            grid: { color: 'rgba(51,65,85,0.5)' }
+          }
+        }
+      }
+    });
+
+    // ====================== HELPERS ======================
+    function sma(data, period) {
+      if (data.length < period) return null;
+      const slice = data.slice(-period);
+      return slice.reduce((a, b) => a + b, 0) / period;
+    }
+
+    function formatMoney(n) {
+      return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function updateUI() {
+      const equity = cash + position * (prices[prices.length - 1] || 100);
+      const pnl = equity - parseFloat(document.getElementById('capital').value);
+      
+      document.getElementById('equity').textContent = formatMoney(equity);
+      document.getElementById('pnl').textContent = formatMoney(pnl);
+      document.getElementById('pnl').className = `text-xl font-bold mt-1 ${pnl >= 0 ? 'positive' : 'negative'}`;
+      document.getElementById('position').textContent = position > 0 ? `LONG ${position}` : 'FLAT';
+      document.getElementById('price').textContent = formatMoney(prices[prices.length - 1] || 100);
+    }
+
+    function addTradeLog(type, price, shares, pnl = null) {
+      const log = document.getElementById('tradeLog');
+      if (log.children[0]?.classList.contains('text-slate-500')) log.innerHTML = '';
+
+      const div = document.createElement('div');
+      div.className = `p-2 rounded ${type === 'BUY' ? 'signal-buy' : 'signal-sell'}`;
+      div.innerHTML = `
+        <div class="flex justify-between">
+          <span class="font-medium">${type}</span>
+          <span>${formatMoney(price)}</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-0.5">
+          ${shares} shares ${pnl !== null ? `• P&L: ${formatMoney(pnl)}` : ''}
+        </div>
+      `;
+      log.prepend(div);
+    }
+
+    // ====================== CORE LOGIC ======================
+    function nextTick() {
+      // Generate next price (random walk)
+      const last = prices.length ? prices[prices.length - 1] : 100;
+      const change = (Math.random() - 0.48) * 1.8; // slight upward bias
+      const newPrice = Math.max(10, last + change);
+      prices.push(+newPrice.toFixed(2));
+
+      const shortPeriod = parseInt(document.getElementById('shortSMA').value);
+      const longPeriod = parseInt(document.getElementById('longSMA').value);
+
+      const sSMA = sma(prices, shortPeriod);
+      const lSMA = sma(prices, longPeriod);
+
+      shortSMA.push(sSMA);
+      longSMA.push(lSMA);
+
+      // Trading logic
+      if (sSMA !== null && lSMA !== null && prices.length > longPeriod) {
+        const prevShort = shortSMA[shortSMA.length - 2];
+        const prevLong = longSMA[longSMA.length - 2];
+
+        // Golden Cross → BUY
+        if (prevShort <= prevLong && sSMA > lSMA && position === 0) {
+          const capital = cash;
+          const sizePct = parseFloat(document.getElementById('posSize').value) / 100;
+          const invest = capital * sizePct;
+          const shares = Math.floor(invest / newPrice);
+          if (shares > 0) {
+            position = shares;
+            entryPrice = newPrice;
+            cash -= shares * newPrice;
+            addTradeLog('BUY', newPrice, shares);
+          }
+        }
+        // Death Cross → SELL
+        else if (prevShort >= prevLong && sSMA < lSMA && position > 0) {
+          const pnl = (newPrice - entryPrice) * position;
+          cash += position * newPrice;
+          addTradeLog('SELL', newPrice, position, pnl);
+          position = 0;
+          entryPrice = 0;
+        }
+      }
+
+      // Update chart (keep last 80 candles)
+      const maxPoints = 80;
+      const start = Math.max(0, prices.length - maxPoints);
+      
+      chart.data.labels = prices.slice(start).map((_, i) => start + i);
+      chart.data.datasets[0].data = prices.slice(start);
+      chart.data.datasets[1].data = shortSMA.slice(start);
+      chart.data.datasets[2].data = longSMA.slice(start);
+      chart.update('none');
+
+      updateUI();
+      candle++;
+    }
+
+    // ====================== CONTROLS ======================
+    document.getElementById('startBtn').addEventListener('click', () => {
+      if (isRunning) return;
+      isRunning = true;
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('pauseBtn').disabled = false;
+
+      // Disable inputs while running
+      document.querySelectorAll('input').forEach(i => i.disabled = true);
+
+      const speed = parseInt(document.getElementById('speed').value);
+      intervalId = setInterval(nextTick, speed);
+    });
+
+    document.getElementById('pauseBtn').addEventListener('click', () => {
+      isRunning = false;
+      clearInterval(intervalId);
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('pauseBtn').disabled = true;
+      document.querySelectorAll('input').forEach(i => i.disabled = false);
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      clearInterval(intervalId);
+      isRunning = false;
+      prices = [];
+      shortSMA = [];
+      longSMA = [];
+      trades = [];
+      cash = parseFloat(document.getElementById('capital').value);
+      position = 0;
+      entryPrice = 0;
+      candle = 0;
+
+      chart.data.labels = [];
+      chart.data.datasets.forEach(d => d.data = []);
+      chart.update();
+
+      document.getElementById('tradeLog').innerHTML = '<div class="text-slate-500 text-center py-8">No trades yet</div>';
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('pauseBtn').disabled = true;
+      document.querySelectorAll('input').forEach(i => i.disabled = false);
+      updateUI();
+    });
+
+    // Initial UI
+    updateUI();
+  </script>
+</body>
+</html>
